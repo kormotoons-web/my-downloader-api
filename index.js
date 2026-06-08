@@ -5,13 +5,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// স্থায়ী সমাধান: সরাসরি অফিশিয়াল মেইনস্ট্রিম ইঞ্জিন বাইপাস
 app.post('/api/json', async (req, res) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ status: 'error', text: 'URL is required' });
 
-    // বিকল্প ও অত্যন্ত শক্তিশালী ফ্রি এপিআই এগ্রিগেটর যা ইনস্টাগ্রাম ব্লক করতে পারে না
-    const targetApi = `https://co.wuk.sh/api/json`;
+    // বর্তমান সচল মূল এপিআই এন্ডপয়েন্ট
+    const targetApi = 'https://co.wuk.sh/api/json';
 
     try {
         const response = await fetch(targetApi, {
@@ -22,12 +21,14 @@ app.post('/api/json', async (req, res) => {
                 'Origin': 'https://cobalt.tools',
                 'Referer': 'https://cobalt.tools/'
             },
+            // এটিই হচ্ছে ইনস্টাগ্রাম রিলসের জন্য বর্তমান নিখুঁত প্যারামিটার ফরমেট
             body: JSON.stringify({
                 url: url,
-                vQuality: '720',
-                vCodec: 'h264',
+                vQuality: 'max',      // কোয়ালিটি 'max' দিতে হবে, ৭২০ দিলে এরর আসে
+                filenamePattern: 'classic',
                 isAudioOnly: false,
-                isNoTTWatermark: true
+                isNoTTWatermark: true,
+                disableMetadata: false
             })
         });
 
@@ -36,22 +37,14 @@ app.post('/api/json', async (req, res) => {
             return res.json(data);
         }
 
-        // যদি উপরের এপিআই ব্যর্থ হয়, তবে ব্যাকআপ ইঞ্জিন রান করবে
-        const backupResponse = await fetch('https://api.cobalt.tools/api/json', {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ url: url, videoQuality: '720', downloadMode: 'auto' })
-        });
-
-        const backupData = await backupResponse.json();
-        res.status(backupResponse.status).json(backupData);
+        // যদি কোনো কারণে ফেল করে, তবে এরর কোড সহ ডিটেইলস পাস করবে
+        const errText = await response.text();
+        console.error('API Error Response:', errText);
+        res.status(response.status).json({ status: 'error', text: 'Server response failure. Try another link.' });
 
     } catch (error) {
-        console.error('Error root:', error.message);
-        res.status(500).json({ status: 'error', text: 'Server engine bypass failed. Please try again.' });
+        console.error('System Error:', error.message);
+        res.status(500).json({ status: 'error', text: 'Bypass engine failed.' });
     }
 });
 
