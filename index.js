@@ -10,8 +10,10 @@ app.post('/api/json', async (req, res) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ status: 'error', text: 'URL is required' });
 
-    // শুধুমাত্র সচল এবং রানিং অফিশিয়াল কোবাল্ট ইনস্ট্যান্স
+    // সচল এবং ক্লাউডফ্লেয়ার ব্লক-মুক্ত কোবাল্ট ইনস্ট্যান্সের তালিকা
     const cobaltInstances = [
+        'https://cobalt.lonelil.com/api/json',
+        'https://cobalt.hyonsu.com/api/json',
         'https://api.cobalt.tools/api/json'
     ];
 
