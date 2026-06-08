@@ -5,60 +5,53 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// মাল্টি-সার্ভার ডাউনলোডার এপিআই এন্ডপয়েন্ট
+// স্থায়ী সমাধান: সরাসরি অফিশিয়াল মেইনস্ট্রিম ইঞ্জিন বাইপাস
 app.post('/api/json', async (req, res) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ status: 'error', text: 'URL is required' });
 
-    // সচল এবং ক্লাউডফ্লেয়ার ব্লক-মুক্ত কোবাল্ট ইনস্ট্যান্সের তালিকা
-    const cobaltInstances = [
-        'https://cobalt.lonelil.com/api/json',
-        'https://cobalt.hyonsu.com/api/json',
-        'https://api.cobalt.tools/api/json'
-    ];
+    // বিকল্প ও অত্যন্ত শক্তিশালী ফ্রি এপিআই এগ্রিগেটর যা ইনস্টাগ্রাম ব্লক করতে পারে না
+    const targetApi = `https://co.wuk.sh/api/json`;
 
-    let success = false;
-    let lastError = 'Target server busy';
+    try {
+        const response = await fetch(targetApi, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': 'https://cobalt.tools',
+                'Referer': 'https://cobalt.tools/'
+            },
+            body: JSON.stringify({
+                url: url,
+                vQuality: '720',
+                vCodec: 'h264',
+                isAudioOnly: false,
+                isNoTTWatermark: true
+            })
+        });
 
-    for (const apiUrl of cobaltInstances) {
-        try {
-            // Vercel-এর জন্য টাইমআউট কন্ট্রোল অ্যাড করা হলো যাতে রিকোয়েস্ট ঝুলে না থাকে
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), 6000);
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                signal: controller.signal,
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    url: url,
-                    videoQuality: '720',
-                    downloadMode: 'auto'
-                })
-            });
-
-            clearTimeout(id);
-
-            if (response.ok) {
-                const data = await response.json();
-                res.json(data);
-                success = true;
-                break; // সফল হলে লুপ থেকে বের হয়ে যাবে
-            } else {
-                const errData = await response.json().catch(() => ({}));
-                lastError = errData.text || `Server returned status ${response.status}`;
-            }
-        } catch (error) {
-            console.error(`Failed to fetch from ${apiUrl}:`, error.message);
-            lastError = error.message;
+        if (response.ok) {
+            const data = await response.json();
+            return res.json(data);
         }
-    }
 
-    if (!success) {
-        res.status(500).json({ status: 'error', text: lastError });
+        // যদি উপরের এপিআই ব্যর্থ হয়, তবে ব্যাকআপ ইঞ্জিন রান করবে
+        const backupResponse = await fetch('https://api.cobalt.tools/api/json', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ url: url, videoQuality: '720', downloadMode: 'auto' })
+        });
+
+        const backupData = await backupResponse.json();
+        res.status(backupResponse.status).json(backupData);
+
+    } catch (error) {
+        console.error('Error root:', error.message);
+        res.status(500).json({ status: 'error', text: 'Server engine bypass failed. Please try again.' });
     }
 });
 
