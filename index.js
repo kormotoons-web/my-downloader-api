@@ -5,50 +5,40 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// অল-ইন-ওয়ান ডিরেক্ট ডাউনলোডার সার্ভিস
 app.post('/api/json', async (req, res) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ status: 'error', text: 'URL is required' });
 
     try {
-        // একটি ওপেন-সোর্স গ্লোবাল ডাউনলোডার গেটওয়ে
-        const targetUrl = `https://api.sandipbaruwal.com.np/api/autodownload?url=${encodeURIComponent(url)}`;
+        // সোর্স ১: অল-ইন-ওয়ান ডাউনলোডার গেটওয়ে
+        const response = await fetch(`https://api.agatz.xyz/api/downloader?url=${encodeURIComponent(url)}`);
         
-        const response = await fetch(targetUrl, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
-
         if (response.ok) {
             const result = await response.json();
-            
-            // ফেসবুক, টিকটক, ইনস্টাগ্রামের মিডিয়া ইউআরএল ফিল্টার করা
-            if (result && result.data && result.data.url) {
-                return res.json({
-                    status: 'stream',
-                    url: result.data.url,
-                    text: result.data.title || 'Download Video'
-                });
-            }
-            
-            // বিকল্প এপিআই ফরমেট ম্যাচিং
-            if (result && result.url) {
-                return res.json({
-                    status: 'stream',
-                    url: result.url,
-                    text: 'Download Link'
-                });
+            if (result && result.status === 200 && result.data) {
+                // বিভিন্ন প্ল্যাটফর্মের ডাটা ফরমেট চেক করা
+                const videoUrl = result.data.url || result.data.hd || result.data.mp4 || result.data.watermark;
+                if (videoUrl) {
+                    return res.json({ status: 'stream', url: videoUrl });
+                }
             }
         }
 
-        res.status(500).json({ status: 'error', text: 'Bypass engine busy. Try another link.' });
+        // সোর্স ২ (ব্যাকআপ): যদি ১ম সোর্স কাজ না করে
+        const backupResponse = await fetch(`https://api.alyachan.pro/api/downloader?url=${encodeURIComponent(url)}`);
+        if (backupResponse.ok) {
+            const backupResult = await backupResponse.json();
+            if (backupResult && backupResult.status === 200 && backupResult.data) {
+                const backupUrl = backupResult.data.url || backupResult.data.video;
+                if (backupUrl) return res.json({ status: 'stream', url: backupUrl });
+            }
+        }
+
+        res.status(500).json({ status: 'error', text: 'All server engines are busy. Try another link!' });
 
     } catch (error) {
-        console.error('Bypass error:', error.message);
-        res.status(500).json({ status: 'error', text: 'Connection timeout. Please retry.' });
+        console.error(error);
+        res.status(500).json({ status: 'error', text: 'Server response error. Please retry.' });
     }
 });
 
