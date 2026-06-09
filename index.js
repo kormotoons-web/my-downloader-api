@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const axios = require('axios'); 
+const instagramGetUrl = require('instagram-url-direct'); 
 const app = express();
 
 app.use(cors());
@@ -11,29 +11,33 @@ app.post('/api/json', async (req, res) => {
     if (!url) return res.status(400).json({ status: 'error', text: 'URL is required' });
 
     try {
-        // কোবাল্টের গ্লোবাল ওয়ার্কিং এপিআই এন্ডপয়েন্ট
-        const response = await axios.post('https://api.cobalt.tools/', {
-            url: url
-        }, {
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            timeout: 12000
-        });
-
-        if (response.data && response.data.url) {
-            return res.json({ 
-                status: 'stream', 
-                url: response.data.url 
-            });
-        }
+        // কোনো থার্ড পার্টি এপিআই ছাড়া সরাসরি স্ক্র্যাপ করা
+        if (url.includes('instagram.com')) {
+            const links = await instagramGetUrl(url);
+            
+            if (links && links.url_list && links.url_list.length > 0) {
+                return res.json({ 
+                    status: 'stream', 
+                    url: links.url_list[0] 
+                });
+            }
+        } 
         
-        res.status(500).json({ status: 'error', text: 'Link processing failed on server.' });
+        // যদি অন্য কোনো প্ল্যাটফর্মের লিঙ্ক হয়, সেটার জন্য একটা ডিরেক্ট ওপেন গেটওয়ে
+        const directProxy = `https://api.vkrhost.xyz/api/download?url=${encodeURIComponent(url)}`;
+        const response = await fetch(directProxy);
+        if (response.ok) {
+            const result = await response.json();
+            if (result && result.data && result.data.stream) {
+                return res.json({ status: 'stream', url: result.data.stream });
+            }
+        }
+
+        res.status(500).json({ status: 'error', text: 'Video link could not be parsed. Try another post!' });
 
     } catch (error) {
-        console.error('API Error:', error.message);
-        res.status(500).json({ status: 'error', text: 'Engine side error. Please retry.' });
+        console.error('Scraper Error:', error.message);
+        res.status(500).json({ status: 'error', text: 'Server processing failed. Retry once.' });
     }
 });
 
